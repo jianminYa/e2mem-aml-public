@@ -1,0 +1,29 @@
+services:
+  aml-memory-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: e2mem-evidence-anchor:v2.6
+    container_name: aml-e2mem-evidence-anchor
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - E2MEM_HOST=0.0.0.0
+      - E2MEM_MODE=competition
+      - E2MEM_DB=/data/memory.sqlite3
+      - MEMORY_SYSTEM_KEY=${MEMORY_SYSTEM_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+    volumes:
+      - memory_data:/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  memory_data:
