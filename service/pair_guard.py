@@ -50,6 +50,25 @@ STOPWORDS = frozenset({
     "just", "should", "now", "would", "could", "might", "may", "also"
 })
 
+CONV_STOPWORDS = frozenset({
+    "keep", "keeps", "keeping", "kept",
+    "said", "say", "says", "saying",
+    "told", "tell", "tells", "telling",
+    "talk", "talks", "talking", "talked",
+    "feel", "feels", "feeling", "felt",
+    "think", "thinks", "thinking", "thought",
+    "know", "knows", "knowing", "knew",
+    "going", "goes", "went", "gone",
+    "come", "comes", "coming", "came",
+    "make", "makes", "making", "made",
+    "take", "takes", "taking", "took",
+    "good", "nice", "well", "great", "sure",
+    "time", "day", "week", "month", "year",
+    "user", "assistant", "system", "event", "episode",
+    "recent", "conversation", "expressed", "shared", "stated",
+    "reflected", "noted", "mentioned"
+})
+
 
 
 def normalize_contractions(text: str) -> str:
@@ -112,20 +131,7 @@ class PairGuard:
 
     def __init__(self, min_shared_keywords: int = 2, stopword_cutoff: int = 100):
         self.min_shared_keywords = min_shared_keywords
-        # Basic common stopwords to ignore when computing subject overlap
-        self.stopwords = frozenset({
-            "the", "a", "an", "is", "was", "are", "were", "been", "be", "have",
-            "has", "had", "do", "does", "did", "to", "at", "in", "on", "for",
-            "with", "about", "against", "between", "into", "through", "during",
-            "before", "after", "above", "below", "from", "up", "down", "of",
-            "and", "but", "or", "as", "if", "because", "i", "you", "he", "she",
-            "it", "we", "they", "me", "him", "her", "us", "them", "my", "your",
-            "his", "their", "this", "that", "these", "those", "what", "which",
-            "who", "whom", "whose", "when", "where", "why", "how", "all", "any",
-            "both", "each", "few", "more", "most", "other", "some", "such",
-            "only", "own", "same", "so", "than", "too", "very", "can", "will",
-            "just", "should", "now"
-        })
+        self.stopwords = STOPWORDS | CONV_STOPWORDS
 
     def content_keywords(self, tokens: Sequence[str]) -> frozenset[str]:
         return frozenset(t for t in tokens if len(t) > 2 and t not in self.stopwords and t not in NEGATION_WORDS)
