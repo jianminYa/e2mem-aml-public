@@ -240,20 +240,8 @@ class EvidenceAnchorEngine:
                 best_overlap = overlap
                 best_row = r
 
-        if best_row and (best_overlap > 0.12 or (evidence_text and evidence_text[:48].lower() in str(best_row.get("content") or "").lower())):
-            best_dict = dict(best_row)
-            try:
-                b_idx = raw_rows.index(best_row)
-                win = []
-                if b_idx > 0 and len(str(raw_rows[b_idx - 1].get("content") or "")) <= 280:
-                    win.append(dict(raw_rows[b_idx - 1]))
-                win.append(best_dict)
-                if b_idx < len(raw_rows) - 1 and len(str(raw_rows[b_idx + 1].get("content") or "")) <= 280:
-                    win.append(dict(raw_rows[b_idx + 1]))
-                best_dict["_window"] = win
-            except Exception:
-                best_dict["_window"] = [best_dict]
-            return best_dict
+        if best_row and best_overlap > 0.12:
+            return dict(best_row)
 
         return None
 
@@ -274,10 +262,9 @@ class EvidenceAnchorEngine:
 
         quotas = channel_quotas if channel_quotas is not None else CHANNEL_QUOTAS
 
-        # Cache parent episode lookup and track already-rendered episode summaries and source spans
+        # Cache parent episode lookup and track already-rendered episode summaries
         parent_cache: dict[str, str] = {}
         rendered_episodes: set[str] = set()
-        rendered_source_spans: dict[str, list[str]] = {}
 
         # 1. Map Events to their precision Tri-Tier representation (Event + Episode + Focused Verbatim Source)
         grounded_candidates: list[EvidenceItem] = []
@@ -327,11 +314,14 @@ class EvidenceAnchorEngine:
                     parent_text = parent_cache[parent_id]
 
                 if parent_text:
-                    if parent_id and parent_id not in rendered_episodes:
-                        lines.append(f"Episode: {parent_text[:380]}")
-                        rendered_episodes.add(parent_id)
+                    if undated_dialogue_mode:
+                        if parent_id and parent_id not in rendered_episodes:
+                            lines.append(f"Episode: {parent_text[:450]}")
+                            rendered_episodes.add(parent_id)
+                        else:
+                            lines.append(f"Episode: {parent_text[:140]}")
                     else:
-                        lines.append(f"Episode: {parent_text[:110]}")
+                        lines.append(f"Episode: {parent_text[:450]}")
 
                 ev_quote = str(hit.get("evidence") or "").strip()
                 focused_raw = ""
@@ -345,53 +335,19 @@ class EvidenceAnchorEngine:
                                 if source_time[:10] != raw_st[:10]:
                                     raw_time_mismatch = True
                             if not raw_time_mismatch:
-                                win_turns = best_raw.get("_window")
-                                if win_turns and len(win_turns) > 1:
-                                    lines_win = []
-                                    for w in win_turns:
-                                        r_role = str(w.get("role") or "").strip().capitalize()
-                                        r_txt = str(w.get("content") or "").strip()
-                                        if r_txt:
-                                            lines_win.append(f"{r_role}: {r_txt}" if r_role else r_txt)
-                                    joined_win = "\n".join(lines_win)
-                                    if len(joined_win) <= 420:
-                                        focused_raw = joined_win
-                                    else:
-                                        focused_raw = self.extract_focused_verbatim_span(
-                                            best_raw["content"],
-                                            event_text=event_text,
-                                            evidence_text=ev_quote,
-                                            query=query,
-                                            max_chars=320,
-                                        )
-                                else:
-                                    focused_raw = self.extract_focused_verbatim_span(
-                                        best_raw["content"],
-                                        event_text=event_text,
-                                        evidence_text=ev_quote,
-                                        query=query,
-                                        max_chars=320,
-                                    )
+                                focused_raw = self.extract_focused_verbatim_span(
+                                    best_raw["content"],
+                                    event_text=event_text,
+                                    evidence_text=ev_quote,
+                                    query=query,
+                                    max_chars=300,
+                                )
                     except Exception:
                         focused_raw = ""
 
                 # Combine stored evidence quote with focused raw span without bloat or date confusion
                 source_line = ""
-                sess_key = parent_id or str(hit.get("session_id") or "")
-                is_overlap = False
-                if sess_key and focused_raw:
-                    prior_sources = rendered_source_spans.setdefault(sess_key, [])
-                    is_overlap = any(
-                        (len(focused_raw) >= 30 and (focused_raw[:60].casefold() in prev.casefold() or prev[:60].casefold() in focused_raw.casefold()))
-                        for prev in prior_sources
-                    )
-                    if not is_overlap:
-                        prior_sources.append(focused_raw)
-
-                if is_overlap:
-                    # In same session where broad context is already rendered, keep atomic quote to avoid token bloat
-                    source_line = ev_quote[:200] if ev_quote else focused_raw[:120]
-                elif ev_quote and focused_raw:
+                if ev_quote and focused_raw:
                     if ev_quote[:50].casefold() in focused_raw.casefold():
                         source_line = focused_raw
                     elif focused_raw[:50].casefold() in ev_quote.casefold():
@@ -584,12 +540,8 @@ class EvidenceAnchorEngine:
                             ep_event_counts[block.parent_id] = ep_event_counts.get(block.parent_id, 0) + 1
 
         # Relevance backfill for any unused budget (preserving atomic pair guarantee)
-        top_cand_score = context_blocks[0].score if context_blocks else 1.0
         for block in context_blocks:
             if block.memory_id in used_ids:
-                continue
-            # Noise suppression: do not admit low-relevance tail noise into dialogue contexts
-            if top_cand_score > 0 and block.score < 0.55 * top_cand_score and block.score < 0.70:
                 continue
             if block.kind == "event" and block.parent_id:
                 if ep_event_counts.get(block.parent_id, 0) >= (max_events_primary + 2):

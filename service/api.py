@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="E2Mem Evidence Anchor AML Service",
     description="Agent Memory Leaderboard (AML) Official Microservice Adapter",
-    version="2.7.0",
+    version="2.6.0",
     lifespan=lifespan,
 )
 
@@ -110,7 +110,7 @@ class SearchResponse(BaseModel):
 
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.7.0"}
+    return {"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.6.0"}
 
 
 @app.post("/add", status_code=status.HTTP_200_OK, dependencies=[Depends(verify_api_key)])
@@ -158,7 +158,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self._reply(200, {"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.7.0"})
+            self._reply(200, {"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.6.0"})
         else:
             self._reply(404, {"detail": "not found"})
 

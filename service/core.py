@@ -409,98 +409,6 @@ def segment_document_clauses(text: str) -> list[str]:
     return parts
 
 
-ENTITY_SPLIT_REGEX = re.compile(r"\b([A-Z][a-zA-Z0-9_'\-]*(?:\s+[A-Z][a-zA-Z0-9_'\-]*)*)\b")
-ENTITY_EXCLUDE_WORDS = STOPWORDS | {
-    "user", "assistant", "system", "event", "episode", "note", "session",
-    "turn", "conversation", "yesterday", "tomorrow", "today",
-    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
-    "january", "february", "march", "april", "may", "june", "july", "august",
-    "september", "october", "november", "december", "specific", "unspecified",
-    "detail", "details", "source", "evidence", "fact", "facts", "status",
-    "time", "date", "role", "kind", "id", "preference", "preferences"
-}
-
-
-def extract_salient_entities(
-    content: str,
-    keywords: list[str] | str | None = None,
-    aliases: list[str] | str | None = None,
-    query: str = "",
-) -> list[str]:
-    """Extract salient proper nouns, named entities, and key noun phrases without LLM."""
-    entities: list[str] = []
-    seen: set[str] = set()
-
-    # 1. Inspect aliases if structured
-    if aliases:
-        a_list = []
-        if isinstance(aliases, str):
-            try:
-                parsed = json.loads(aliases)
-                if isinstance(parsed, list):
-                    a_list = parsed
-            except Exception:
-                a_list = [a.strip() for a in aliases.split(",") if a.strip()]
-        elif isinstance(aliases, list):
-            a_list = aliases
-        for a in a_list:
-            a_clean = str(a).strip().strip('"').strip("'")
-            a_clean = re.sub(r"['’]s\b", "", a_clean).strip()
-            if len(a_clean) >= 3 and a_clean.lower() not in ENTITY_EXCLUDE_WORDS:
-                if a_clean.lower() not in seen:
-                    seen.add(a_clean.lower())
-                    entities.append(a_clean)
-
-    # 2. Extract capitalized entity sequences from content
-    if content:
-        matches = ENTITY_SPLIT_REGEX.findall(content)
-        for m in matches:
-            m_clean = str(m).strip().strip("'").strip('"')
-            m_clean = re.sub(r"['’]s\b", "", m_clean).strip()
-            m_lower = m_clean.lower()
-            if len(m_clean) < 3 or m_lower in ENTITY_EXCLUDE_WORDS:
-                continue
-            words = m_clean.split()
-            if len(words) == 1:
-                if m_lower in ENTITY_EXCLUDE_WORDS:
-                    continue
-                if m_clean in {
-                    "I", "You", "He", "She", "It", "We", "They", "My", "His", "Her", "Our", "Their",
-                    "The", "This", "That", "There", "Here", "What", "When", "Where", "Why", "How",
-                    "After", "Before", "During", "Because", "Also", "Then", "Yes", "No", "One", "Two"
-                }:
-                    continue
-            if m_lower not in seen:
-                seen.add(m_lower)
-                entities.append(m_clean)
-
-    # 3. Inspect keywords if high-salience
-    if keywords:
-        k_list = []
-        if isinstance(keywords, str):
-            try:
-                parsed = json.loads(keywords)
-                if isinstance(parsed, list):
-                    k_list = parsed
-            except Exception:
-                k_list = [k.strip() for k in keywords.split(",") if k.strip()]
-        elif isinstance(keywords, list):
-            k_list = keywords
-        for k in k_list:
-            k_clean = str(k).strip()
-            k_clean = re.sub(r"['’]s\b", "", k_clean).strip()
-            k_lower = k_clean.lower()
-            if len(k_clean) >= 4 and k_lower not in ENTITY_EXCLUDE_WORDS and not k_clean.isdigit():
-                if k_lower not in seen:
-                    seen.add(k_lower)
-                    entities.append(k_clean)
-
-    # Prioritize entities that are NOT in the query (bridge entities) first
-    q_lower = query.casefold() if query else ""
-    entities.sort(key=lambda e: (0 if (q_lower and e.casefold() not in q_lower) else 1, -len(e)))
-    return entities
-
-
 class MemoryService:
     def __init__(
         self,
@@ -940,82 +848,6 @@ class MemoryService:
 
         return result, stats
 
-    def expand_multihop_entities(
-        self,
-        user_id: str,
-        seed_events: list[dict],
-        seen_event_ids: set[str],
-        query: str = "",
-        rows_by_id: dict[str, dict] | None = None,
-        parent_by_id: dict[str, dict] | None = None,
-        allowed_request_ids: set[str] | None = None,
-        bridge_quota: int = 4,
-        decay_factor: float = 0.85,
-    ) -> list[dict]:
-        """Zero-LLM Multi-Hop Entity Relation Expansion.
-
-        Extracts salient named entities / proper nouns from top initial event hits,
-        and retrieves 1-hop connected events via SQLite query, applying score decay.
-        """
-        if not seed_events or bridge_quota <= 0:
-            return []
-
-        bridge_candidates: list[dict] = []
-        added_bridge_ids: set[str] = set()
-        seed_ids = {str(s.get("id") or "") for s in seed_events if s.get("id")}
-        all_seen = set(seen_event_ids) | seed_ids
-        parent_map = parent_by_id or {}
-        r_map = rows_by_id or {}
-
-        for seed in seed_events:
-            seed_score = float(seed.get("score") or 1.0)
-            seed_id = str(seed.get("id") or "")
-            content = str(seed.get("content") or "")
-            kws = seed.get("keywords")
-            aliases = seed.get("aliases")
-
-            entities = extract_salient_entities(content, keywords=kws, aliases=aliases, query=query)
-            for ent in entities:
-                ent_clean = ent.strip().replace("%", "").replace("_", "")
-                if len(ent_clean) < 3:
-                    continue
-
-                # Query 1-hop related events from SQLite for this user
-                sql = "SELECT id, request_id, parent_id, content FROM memories WHERE user_id=? AND kind='event' AND content LIKE ? AND id != ?"
-                with self.lock:
-                    matched_rows = [
-                        dict(r) for r in self.db.execute(sql, (user_id, f"%{ent_clean}%", seed_id)).fetchall()
-                    ]
-
-                for row in matched_rows:
-                    r_id = row.get("id")
-                    if not r_id or r_id in all_seen or r_id in added_bridge_ids:
-                        continue
-                    if allowed_request_ids is not None and row.get("request_id") not in allowed_request_ids:
-                        continue
-
-                    # Retrieve full pre-loaded row if available to preserve seq_id & vector
-                    if r_id in r_map:
-                        bridge_ev = dict(r_map[r_id])
-                    else:
-                        bridge_ev = dict(row)
-
-                    bridge_ev["score"] = round(decay_factor * seed_score, 4)
-                    bridge_ev["_bridge_from"] = seed_id
-                    bridge_ev["_bridge_entity"] = ent_clean
-                    bridge_ev["_is_bridge"] = True
-                    p_id = bridge_ev.get("parent_id")
-                    if p_id and p_id in parent_map:
-                        bridge_ev["parent_content"] = parent_map[p_id].get("content")
-
-                    added_bridge_ids.add(r_id)
-                    bridge_candidates.append(bridge_ev)
-
-                    if len(bridge_candidates) >= bridge_quota:
-                        return bridge_candidates
-
-        return bridge_candidates
-
     def search(
         self,
         payload: dict,
@@ -1081,8 +913,6 @@ class MemoryService:
 
         for idx, row in enumerate(rows, 1):
             row["seq_id"] = idx
-
-        rows_by_id = {str(r.get("id") or ""): r for r in rows}
 
         raw_all = [r for r in rows if r["kind"] == "raw"]
         raw_parents = [r for r in raw_all if not r.get("parent_id")]
@@ -1260,34 +1090,6 @@ class MemoryService:
                         ch_copy["parent_content"] = top_ep["content"]
                         synergy_events.append(ch_copy)
                         seen_event_ids.add(ch_ev["id"])
-
-        # 3. Ensure top direct event hits are seeded into synergy pool
-        for ev in channels.get("event", [])[:16]:
-            if ev["id"] not in seen_event_ids:
-                ev_copy = dict(ev)
-                parent = parent_by_id.get(ev.get("parent_id"))
-                if parent:
-                    ev_copy["parent_content"] = parent["content"]
-                synergy_events.append(ev_copy)
-                seen_event_ids.add(ev["id"])
-
-        synergy_events.sort(key=lambda r: (-r["score"], r["id"]))
-
-        # 4. Multi-Hop Entity Relation Expansion (Zero-LLM 1-hop SQL bridge)
-        bridge_candidates = self.expand_multihop_entities(
-            user_id=user_id,
-            seed_events=synergy_events[:8],
-            seen_event_ids=seen_event_ids,
-            query=query,
-            rows_by_id=rows_by_id,
-            parent_by_id=parent_by_id,
-            allowed_request_ids=allowed_request_ids,
-            bridge_quota=4,
-            decay_factor=0.85,
-        )
-        for b_ev in bridge_candidates:
-            synergy_events.append(b_ev)
-            seen_event_ids.add(b_ev["id"])
 
         synergy_events.sort(key=lambda r: (-r["score"], r["id"]))
 

@@ -104,12 +104,3 @@ def test_top_k_boundary_pair_guard_never_overflows(tmp_path):
     # When top_k=2, both fit
     res2, _ = svc.search({"user_id": "u1", "query": "anxious exams", "top_k": 2})
     assert len(res2["data"]) == 2
-
-    # When top_k=10, len(output) must be <= 10
-    res10, _ = svc.search({"user_id": "u1", "query": "anxious exams", "top_k": 10})
-    assert len(res10["data"]) <= 10
-
-    # When top_k=100, len(output) must be <= 100
-    res100, _ = svc.search({"user_id": "u1", "query": "anxious exams", "top_k": 100})
-    assert len(res100["data"]) <= 100
-
