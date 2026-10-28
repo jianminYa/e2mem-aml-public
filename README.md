@@ -235,10 +235,13 @@ All 22 unit and integration tests execute in `< 3.0` seconds:
 
 ---
 
-## 📚 Documentation & Deep Dives
+## 📚 Documentation, Traces & Deep Dives
 
 - [docs/CHALLENGES_AND_RESEARCH_DIRECTIONS.md](docs/CHALLENGES_AND_RESEARCH_DIRECTIONS.md): In-depth failure analysis, JEV latency trade-offs, and strategic consultation questions.
 - [docs/AML_COMPETITION_AND_SYSTEM_GUIDE.md](docs/AML_COMPETITION_AND_SYSTEM_GUIDE.md): Complete technical manual, schema definitions, and mathematical formulations.
+- [docs/analysis_and_badcases/EXTRACTION_EXAMPLES.md](docs/analysis_and_badcases/EXTRACTION_EXAMPLES.md): Concrete examples of raw transcript inputs and extracted Tri-Tier memory units.
+- [docs/analysis_and_badcases/RETRIEVAL_AND_QA_BADCASE_STUDY.md](docs/analysis_and_badcases/RETRIEVAL_AND_QA_BADCASE_STUDY.md): Step-by-step diagnostic breakdown of real benchmark bad cases across LoCoMo, PersonaMem, CLBench, and BEAM.
+- [benchmarks/evaluation_results/results.jsonl](benchmarks/evaluation_results/results.jsonl): Complete, transparent raw evaluation output for all 248 questions (IDs, questions, model answers, baseline scores, and anchor scores).
 
 ---
 

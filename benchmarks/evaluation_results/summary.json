@@ -1,0 +1,70 @@
+{
+  "datasets": {
+    "locomo": {
+      "n": 32,
+      "baseline": 0.625,
+      "anchor": 0.6562,
+      "delta": 0.0312,
+      "improved": 2,
+      "regressed": 1,
+      "tied": 29
+    },
+    "longmemeval_s": {
+      "n": 48,
+      "baseline": 0.5625,
+      "anchor": 0.5625,
+      "delta": 0.0,
+      "improved": 4,
+      "regressed": 4,
+      "tied": 40
+    },
+    "personamem_32k": {
+      "n": 56,
+      "baseline": 0.5179,
+      "anchor": 0.5893,
+      "delta": 0.0714,
+      "improved": 8,
+      "regressed": 4,
+      "tied": 44
+    },
+    "clbench": {
+      "n": 32,
+      "baseline": 0.0625,
+      "anchor": 0.0938,
+      "delta": 0.0312,
+      "improved": 3,
+      "regressed": 2,
+      "tied": 27
+    },
+    "beam_100k": {
+      "n": 80,
+      "baseline": 0.3929,
+      "anchor": 0.4467,
+      "delta": 0.0537,
+      "improved": 14,
+      "regressed": 7,
+      "tied": 59
+    }
+  },
+  "splits": {
+    "dev_cohort": {
+      "n": 124,
+      "baseline": 0.443,
+      "anchor": 0.5005,
+      "delta": 0.0575,
+      "improved": 18,
+      "regressed": 7,
+      "tied": 99
+    },
+    "holdout_cohort": {
+      "n": 124,
+      "baseline": 0.4396,
+      "anchor": 0.4651,
+      "delta": 0.0255,
+      "improved": 13,
+      "regressed": 11,
+      "tied": 100
+    }
+  },
+  "total_questions": 248
+}
