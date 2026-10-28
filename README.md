@@ -90,7 +90,7 @@ The **Agent Memory Leaderboard (AML 2026)** tests autonomous memory systems unde
 ### 1. Balanced 248-Question Multi-Benchmark Cohort
 Evaluated strictly under the frozen official AML evaluation harness (`gpt-4o-mini` reader, official rubric judges, identical random seeds):
 
-| Benchmark Dataset | Questions ($N$) | Evaluation Focus | Official Baseline 1 | Anchor v2.4 | RelayRouter JEV | **Anchor v2.6.1 (Champion)** | Net Delta vs Baseline | Win / Loss vs Baseline |
+| Benchmark Dataset | Questions ($N$) | Evaluation Focus | Official Baseline 1 | Anchor v2.4 | RelayRouter JEV | **Anchor v2.6.1 (Our Current Best)** | Net Delta vs Baseline | Win / Loss vs Baseline |
 | :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | **LoCoMo** | 32 | Multi-session temporal QA | 0.6250 | 0.6250 | 0.6562 | **0.6562** | **+0.0312** | 2 W / 1 L |
 | **PersonaMem-32K** | 56 | Fine-grained preference recall | 0.5179 | 0.5536 | **0.6250** | **0.5893** | **+0.0714** | 8 W / 4 L |

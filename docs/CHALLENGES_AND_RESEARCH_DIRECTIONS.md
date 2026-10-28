@@ -11,7 +11,7 @@
 
 **E²-Mem Evidence Anchor (v2.6.1)** is currently the top-performing long-term memory engine on our 248-question balanced benchmark cohort across 5 diverse AML evaluation datasets:
 
-| Benchmark Dataset | Test Cohort ($N$) | Metric Type | AML Baseline 1 | Anchor v2.4 | RelayRouter JEV | **Anchor v2.6.1 (Current SOTA)** | Net Delta vs Baseline |
+| Benchmark Dataset | Test Cohort ($N$) | Metric Type | AML Baseline 1 | Anchor v2.4 | RelayRouter JEV | **Anchor v2.6.1 (Our Current Best)** | Net Delta vs Baseline |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **LoCoMo** | 32 | Multi-session Dialogue QA | 0.6250 | 0.6250 | 0.6562 | **0.6562** | **+0.0312** |
 | **PersonaMem-32K** | 56 | Persona / Preference QA | 0.5179 | 0.5536 | **0.6250** | **0.5893** | **+0.0714** |
