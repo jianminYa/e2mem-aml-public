@@ -48,8 +48,14 @@ def verify_api_key(
     x_api_key: str | None = Header(None, alias="X-Api-Key"),
 ) -> None:
     expected_key = os.getenv("MEMORY_SYSTEM_KEY", "").strip()
+    is_competition = os.getenv("E2MEM_MODE", "simulator") == "competition"
     if not expected_key:
-        return  # No authentication enforced if MEMORY_SYSTEM_KEY is unset
+        if is_competition:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Server configuration error: MEMORY_SYSTEM_KEY must be configured in competition mode",
+            )
+        return  # No authentication enforced in local simulator mode
 
     # Support Bearer <token>, Token <token>, or X-Api-Key header
     valid_auth_values = {f"Bearer {expected_key}", f"Token {expected_key}", expected_key}
@@ -72,7 +78,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="E2Mem Evidence Anchor AML Service",
     description="Agent Memory Leaderboard (AML) Official Microservice Adapter",
-    version="2.6.0",
+    version="2.6.2",
     lifespan=lifespan,
 )
 
@@ -111,7 +117,7 @@ class SearchResponse(BaseModel):
 
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.6.0"}
+    return {"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.6.2"}
 
 
 @app.post("/add", status_code=status.HTTP_200_OK, dependencies=[Depends(verify_api_key)])
@@ -159,7 +165,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self._reply(200, {"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.6.0"})
+            self._reply(200, {"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.6.2"})
         else:
             self._reply(404, {"detail": "not found"})
 

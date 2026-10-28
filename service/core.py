@@ -65,10 +65,14 @@ def normalize_timestamp(val: object) -> str:
 
 
 def to_sortable_date(val: object) -> str:
-    """Extract standard ISO YYYY-MM-DD or ISO timestamp for accurate chronological sorting."""
+    """Extract standard ISO timestamp (with intra-day time) or YYYY-MM-DD for accurate chronological sorting."""
     norm = normalize_timestamp(val)
     if not norm:
         return ""
+    # Preserve full ISO 8601 with intra-day time if available
+    m_full_iso = re.search(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)", norm)
+    if m_full_iso:
+        return m_full_iso.group(1)
     m_iso = re.search(r"(\d{4}-\d{2}-\d{2})", norm)
     if m_iso:
         return m_iso.group(1)
@@ -491,8 +495,6 @@ class MemoryService:
             self.trace_path: Path | None = Path(trace_file)
         elif os.environ.get("E2MEM_ADD_TRACE_FILE"):
             self.trace_path = Path(os.environ["E2MEM_ADD_TRACE_FILE"])
-        elif db_path != ":memory:":
-            self.trace_path = Path(db_path).parent / "add_traces.jsonl"
         else:
             self.trace_path = None
         if db_path != ":memory:":
@@ -525,6 +527,13 @@ class MemoryService:
 
     def _init_db(self) -> None:
         with self.lock:
+            if self.db_path != ":memory:":
+                try:
+                    self.db.execute("PRAGMA journal_mode=WAL;")
+                    self.db.execute("PRAGMA synchronous=NORMAL;")
+                    self.db.execute("PRAGMA busy_timeout=15000;")
+                except Exception:
+                    pass
             self.db.executescript("""
                 CREATE TABLE IF NOT EXISTS requests(
                     request_id TEXT PRIMARY KEY,
@@ -849,6 +858,8 @@ class MemoryService:
         with self.lock:
             existing = self.db.execute("SELECT body_hash FROM requests WHERE request_id=?", (request_id,)).fetchone()
             if existing:
+                if existing["body_hash"] != body_hash:
+                    raise RuntimeError("request_id reused with different content")
                 return result, {"duplicate": True}
 
             self.db.execute("BEGIN")
@@ -1096,7 +1107,7 @@ class MemoryService:
                     "id": r["id"],
                     "content": r["content"],
                     "score": round(float(r.get("score") or 1.0), 6),
-                    "created_at": normalize_timestamp(r.get("source_time")) or "2026-01-01T00:00:00Z",
+                    "created_at": normalize_timestamp(r.get("source_time")),
                 }
                 for r in selected_raw
             ][:top_k]

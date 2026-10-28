@@ -590,7 +590,7 @@ class EvidenceAnchorEngine:
                 "id": b.memory_id,
                 "content": b.rendered_text,
                 "score": round(b.score, 6),
-                "created_at": b.source_time or "2026-01-01T00:00:00Z",
+                "created_at": b.source_time,
             }
             p_id = pair_partner_map.get(b.memory_id)
             if p_id:
