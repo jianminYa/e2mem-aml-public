@@ -23,6 +23,68 @@ from .model_client import ModelClient
 from .pair_guard import STOPWORDS, tokenize_words
 
 
+MONTH_MAP = {
+    "jan": "01", "january": "01", "feb": "02", "february": "02",
+    "mar": "03", "march": "03", "apr": "04", "april": "04",
+    "may": "05", "jun": "06", "june": "06", "jul": "07", "july": "07",
+    "aug": "08", "august": "08", "sep": "09", "september": "09",
+    "oct": "10", "october": "10", "nov": "11", "november": "11",
+    "dec": "12", "december": "12"
+}
+
+
+def normalize_timestamp(val: object) -> str:
+    """Normalize timestamps (epoch ms, epoch seconds, human dates, ISO strings) to standardized string."""
+    if val is None or val == "":
+        return ""
+    if isinstance(val, (int, float)):
+        if val > 1e11:  # epoch milliseconds (e.g., 1690502400000)
+            try:
+                return datetime.fromtimestamp(val / 1000.0, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            except Exception:
+                pass
+        elif val > 1e8:  # epoch seconds (e.g., 1690502400)
+            try:
+                return datetime.fromtimestamp(val, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            except Exception:
+                pass
+    val_str = str(val).strip()
+    if val_str.isdigit():
+        num = int(val_str)
+        if num > 1e11:
+            try:
+                return datetime.fromtimestamp(num / 1000.0, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            except Exception:
+                pass
+        elif num > 1e8:
+            try:
+                return datetime.fromtimestamp(num, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            except Exception:
+                pass
+    return val_str
+
+
+def to_sortable_date(val: object) -> str:
+    """Extract standard ISO YYYY-MM-DD or ISO timestamp for accurate chronological sorting."""
+    norm = normalize_timestamp(val)
+    if not norm:
+        return ""
+    m_iso = re.search(r"(\d{4}-\d{2}-\d{2})", norm)
+    if m_iso:
+        return m_iso.group(1)
+    m_hum = re.search(r"(\d{1,2})\s+([A-Za-z]+)[,\s]+(\d{4})", norm)
+    if m_hum:
+        d, mon, y = m_hum.group(1), m_hum.group(2).lower(), m_hum.group(3)
+        if mon in MONTH_MAP:
+            return f"{y}-{MONTH_MAP[mon]}-{int(d):02d}"
+    m_hum2 = re.search(r"([A-Za-z]+)\s+(\d{1,2})[,\s]+(\d{4})", norm)
+    if m_hum2:
+        mon, d, y = m_hum2.group(1).lower(), m_hum2.group(2), m_hum2.group(3)
+        if mon in MONTH_MAP:
+            return f"{y}-{MONTH_MAP[mon]}-{int(d):02d}"
+    return norm
+
+
 def estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
@@ -243,7 +305,7 @@ def pin_verbatim_evidence_and_refs(
         matched_msg = chunk[best_msg_idx]
         ref = str(matched_msg.get("source_ref") or f"{session_id}:{chunk_base_idx + best_msg_idx}")
         refs = [ref]
-        msg_date = str(matched_msg.get("timestamp") or "")
+        msg_date = normalize_timestamp(matched_msg.get("timestamp"))
         evidence_str = best_matched_span or ("; ".join(clean_ev_spans[:2]) if clean_ev_spans else event_text[:200])
     else:
         # Do not fabricate a pseudo-attribution to chunk[0]
@@ -319,7 +381,7 @@ def extract_uncovered_user_factlets(
             missing_nums = s_nums - ev_nums
             has_action = bool(
                 re.search(
-                    r"\b(allocated|completed|finished|bought|adopted|acquired|tried|learned|started|considering|brew|brewing|personal best|scale)\b",
+                    r"\b(allocated|completed|finished|bought|adopted|acquired|tried|learned|started|considering|decided|planned|achieved|configured)\b",
                     sent_clean.casefold(),
                 )
             )
@@ -333,13 +395,13 @@ def extract_uncovered_user_factlets(
                 3.5 * len(missing_nums)
                 + (2.5 if has_action else 0.0)
                 + 1.5 * (1.0 - overlap)
-                + (1.0 if re.search(r"[$%]|\b(minutes|seconds|hours|books|scale|miles|km)\b", sent_clean.casefold()) else 0.0)
+                + (1.0 if re.search(r"[$%]|\b(minutes|seconds|hours|days|weeks|months|years|miles|meters|dollars|percent)\b", sent_clean.casefold()) else 0.0)
             )
             if score < 3.2:
                 continue
 
             ref = str(msg.get("source_ref") or f"{session_id}:{chunk_base_idx + offset}")
-            msg_time = str(msg.get("timestamp") or fallback_date)
+            msg_time = normalize_timestamp(msg.get("timestamp")) or fallback_date
             kw_list = sorted(
                 s_words,
                 key=lambda w: (0 if any(c.isdigit() for c in w) else 1, -len(w)),
@@ -571,7 +633,7 @@ class MemoryService:
         for msg_idx, msg in enumerate(messages):
             content = str(msg.get("content") or "")
             ref = str(msg.get("source_ref") or f"{session_id}:{msg_idx}")
-            t_stamp = str(msg.get("timestamp") or "")
+            t_stamp = normalize_timestamp(msg.get("timestamp"))
             role = msg.get("role", "user")
 
             if role == "user" and len(content) > 1200:
@@ -645,7 +707,7 @@ class MemoryService:
                 "parent_id": None,
                 "turn_index": index,
                 "role": msg["role"],
-                "source_time": str(msg.get("timestamp") or ""),
+                "source_time": normalize_timestamp(msg.get("timestamp")),
                 "content": msg["content"],
                 "evidence": "",
                 "source_refs": [ref],
@@ -671,7 +733,7 @@ class MemoryService:
                         "parent_id": parent_raw_id,
                         "turn_index": p_idx * 100 + c_idx,
                         "role": unit["role"],
-                        "source_time": unit["timestamp"],
+                        "source_time": normalize_timestamp(unit.get("timestamp")),
                         "content": unit["content"],
                         "evidence": "",
                         "source_refs": [unit["source_ref"]],
@@ -687,7 +749,7 @@ class MemoryService:
             episode_id = stable_id("ep", request_id, index)
             chunk = chunks[index]
             base_msg_idx = chunk[0].get("parent_msg_idx", index * 8) if chunk else index * 8
-            chunk_time = next((str(m.get("timestamp") or "") for m in chunk if m.get("timestamp")), "")
+            chunk_time = next((normalize_timestamp(m.get("timestamp")) for m in chunk if m.get("timestamp")), "")
             summary = str(item.get("summary") or item.get("episode") or " ".join(m["content"] for m in chunk)).strip()
             if summary:
                 records.append({
@@ -878,7 +940,7 @@ class MemoryService:
 
         # Chronological sort key: respects session timeline and source message index (P1-E fix)
         def _get_sort_key(r: dict) -> tuple:
-            st = str(r.get("source_time") or "")
+            st = to_sortable_date(r.get("source_time") or "")
             src_idx = None
             s_refs = r.get("source_refs")
             if s_refs:
@@ -1030,7 +1092,12 @@ class MemoryService:
             selected_raw = [r for r in raw_chron if r["id"] in picked_ids]
 
             output = [
-                {"id": r["id"], "content": r["content"], "score": round(float(r.get("score") or 1.0), 6)}
+                {
+                    "id": r["id"],
+                    "content": r["content"],
+                    "score": round(float(r.get("score") or 1.0), 6),
+                    "created_at": normalize_timestamp(r.get("source_time")) or "2026-01-01T00:00:00Z",
+                }
                 for r in selected_raw
             ][:top_k]
             stats = {

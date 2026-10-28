@@ -102,6 +102,7 @@ class MemoryRecord(BaseModel):
     id: str
     content: str
     score: float
+    created_at: str = ""
 
 
 class SearchResponse(BaseModel):

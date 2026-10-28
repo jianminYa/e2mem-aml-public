@@ -68,7 +68,11 @@ class AnchoredContextBlock:
             else:
                 header_parts.append(f"Time: {self.source_time}")
         if self.role:
-            header_parts.append(f"Speaker: {self.role}")
+            speaker_name = self.role
+            m_speaker = re.match(r"^([A-Z][a-zA-Z0-9_\- ]{1,20}):\s+", self.content)
+            if m_speaker:
+                speaker_name = m_speaker.group(1).strip()
+            header_parts.append(f"Speaker: {speaker_name}")
 
         header = " | ".join(header_parts)
         if header and f"Time: {self.source_time}" not in self.content:
@@ -413,7 +417,11 @@ class EvidenceAnchorEngine:
             elif undated_dialogue_mode and seq_id > 0:
                 raw_headers.append(f"Turn #{seq_id}")
             if role_str:
-                raw_headers.append(f"Speaker: {role_str}")
+                speaker_name = role_str
+                m_speaker = re.match(r"^([A-Z][a-zA-Z0-9_\- ]{1,20}):\s+", raw_text)
+                if m_speaker:
+                    speaker_name = m_speaker.group(1).strip()
+                raw_headers.append(f"Speaker: {speaker_name}")
             if raw_headers:
                 raw_text = f"[{' | '.join(raw_headers)}]\n{raw_text}"
             seen_ids.add(item_id)
@@ -582,6 +590,7 @@ class EvidenceAnchorEngine:
                 "id": b.memory_id,
                 "content": b.rendered_text,
                 "score": round(b.score, 6),
+                "created_at": b.source_time or "2026-01-01T00:00:00Z",
             }
             p_id = pair_partner_map.get(b.memory_id)
             if p_id:
