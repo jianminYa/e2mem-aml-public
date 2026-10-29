@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: e2mem-evidence-anchor:v2.6.2-clean
+    image: e2mem-evidence-anchor:v2.6.3-clean
     container_name: aml-e2mem-evidence-anchor
     restart: unless-stopped
     ports:
