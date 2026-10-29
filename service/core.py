@@ -21,6 +21,7 @@ from pathlib import Path
 from .evidence_anchor import EvidenceAnchorEngine, token_count
 from .model_client import ModelClient
 from .pair_guard import STOPWORDS, tokenize_words
+from .privacy import redact
 
 
 MONTH_MAP = {
@@ -921,7 +922,44 @@ class MemoryService:
 
         return result, stats
 
-    def search(
+    def search(self, payload: dict, **kwargs) -> tuple[dict, dict]:
+        """Search, then mask credentials in returned text and append a trace record when configured.
+
+        E2MEM_REDACT=0 disables masking (default on). E2MEM_SEARCH_TRACE_FILE=<path.jsonl> logs
+        every request and the exact returned items; logging failures never fail a search.
+        """
+        response, stats = self._search_impl(payload, **kwargs)
+        redactions = 0
+        if os.environ.get("E2MEM_REDACT", "1").lower() not in {"0", "false", "no"}:
+            data, redactions = redact(response["data"])
+            response = {**response, "data": data}
+        stats = {**stats, "redactions": redactions}
+        self._trace_search(payload, response, stats)
+        return response, stats
+
+    def _trace_search(self, payload: dict, response: dict, stats: dict) -> None:
+        path = os.environ.get("E2MEM_SEARCH_TRACE_FILE")
+        if not path:
+            return
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "user_id": payload.get("user_id"),
+            "query": payload.get("query"),
+            "top_k": payload.get("top_k", 100),
+            "options": payload.get("options"),
+            "returned": len(response.get("data") or []),
+            "redactions": stats.get("redactions", 0),
+            "latency_ms": stats.get("latency_ms"),
+            "data": response.get("data"),
+        }
+        try:
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            with self.trace_lock, open(path, "a", encoding="utf-8") as handle:
+                handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+
+    def _search_impl(
         self,
         payload: dict,
         budget: int = 8000,

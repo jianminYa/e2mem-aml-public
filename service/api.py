@@ -84,7 +84,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="E2Mem Evidence Anchor AML Service",
     description="Agent Memory Leaderboard (AML) Official Microservice Adapter",
-    version="2.6.2",
+    version="2.6.3",
     lifespan=lifespan,
 )
 
@@ -119,6 +119,7 @@ class SearchPayload(BaseModel):
     user_id: str = Field(..., description="Target user identifier")
     query: str = Field(..., description="Search query string")
     top_k: int = Field(default=100, ge=1, le=100, description="Maximum number of memories to return (<=100)")
+    options: list[Any] | None = Field(default=None, description="Multiple-choice options (recorded in the search trace only)")
 
 
 class MemoryRecord(BaseModel):
@@ -135,17 +136,17 @@ class SearchResponse(BaseModel):
 @app.api_route("/", methods=["GET", "HEAD", "OPTIONS"], status_code=status.HTTP_200_OK)
 @app.api_route("/health", methods=["GET", "HEAD", "OPTIONS"], status_code=status.HTTP_200_OK)
 async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.6.2"}
+    return {"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.6.3"}
 
 
 @app.api_route("/add", methods=["GET", "HEAD", "OPTIONS"], status_code=status.HTTP_200_OK)
 async def add_probe() -> dict[str, str]:
-    return {"status": "ok", "service": "e2mem-evidence-anchor", "endpoint": "add", "version": "2.6.2"}
+    return {"status": "ok", "service": "e2mem-evidence-anchor", "endpoint": "add", "version": "2.6.3"}
 
 
 @app.api_route("/search", methods=["GET", "HEAD", "OPTIONS"], status_code=status.HTTP_200_OK)
 async def search_probe() -> dict[str, str]:
-    return {"status": "ok", "service": "e2mem-evidence-anchor", "endpoint": "search", "version": "2.6.2"}
+    return {"status": "ok", "service": "e2mem-evidence-anchor", "endpoint": "search", "version": "2.6.3"}
 
 
 @app.post("/add", status_code=status.HTTP_200_OK, dependencies=[Depends(verify_api_key)])
@@ -193,9 +194,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path in {"/", "/health"}:
-            self._reply(200, {"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.6.2"})
+            self._reply(200, {"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.6.3"})
         elif self.path in {"/add", "/search"}:
-            self._reply(200, {"status": "ok", "service": "e2mem-evidence-anchor", "endpoint": self.path[1:], "version": "2.6.2"})
+            self._reply(200, {"status": "ok", "service": "e2mem-evidence-anchor", "endpoint": self.path[1:], "version": "2.6.3"})
         else:
             self._reply(404, {"detail": "not found"})
 
