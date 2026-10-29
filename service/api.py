@@ -115,9 +115,20 @@ class SearchResponse(BaseModel):
     data: list[MemoryRecord]
 
 
-@app.get("/health", status_code=status.HTTP_200_OK)
+@app.api_route("/", methods=["GET", "HEAD", "OPTIONS"], status_code=status.HTTP_200_OK)
+@app.api_route("/health", methods=["GET", "HEAD", "OPTIONS"], status_code=status.HTTP_200_OK)
 async def health() -> dict[str, str]:
     return {"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.6.2"}
+
+
+@app.api_route("/add", methods=["GET", "HEAD", "OPTIONS"], status_code=status.HTTP_200_OK)
+async def add_probe() -> dict[str, str]:
+    return {"status": "ok", "service": "e2mem-evidence-anchor", "endpoint": "add", "version": "2.6.2"}
+
+
+@app.api_route("/search", methods=["GET", "HEAD", "OPTIONS"], status_code=status.HTTP_200_OK)
+async def search_probe() -> dict[str, str]:
+    return {"status": "ok", "service": "e2mem-evidence-anchor", "endpoint": "search", "version": "2.6.2"}
 
 
 @app.post("/add", status_code=status.HTTP_200_OK, dependencies=[Depends(verify_api_key)])
@@ -164,10 +175,26 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(raw)
 
     def do_GET(self) -> None:
-        if self.path == "/health":
+        if self.path in {"/", "/health"}:
             self._reply(200, {"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.6.2"})
+        elif self.path in {"/add", "/search"}:
+            self._reply(200, {"status": "ok", "service": "e2mem-evidence-anchor", "endpoint": self.path[1:], "version": "2.6.2"})
         else:
             self._reply(404, {"detail": "not found"})
+
+    def do_HEAD(self) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, HEAD, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "*")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def do_POST(self) -> None:
         if self.path not in {"/add", "/search"}:
