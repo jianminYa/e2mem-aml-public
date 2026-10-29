@@ -57,10 +57,16 @@ def verify_api_key(
             )
         return  # No authentication enforced in local simulator mode
 
-    # Support Bearer <token>, Token <token>, or X-Api-Key header
-    valid_auth_values = {f"Bearer {expected_key}", f"Token {expected_key}", expected_key}
-    if authorization in valid_auth_values or x_api_key == expected_key:
+    if x_api_key and x_api_key.strip() == expected_key:
         return
+
+    if authorization:
+        val = authorization.strip()
+        if val == expected_key:
+            return
+        parts = val.split()
+        if len(parts) == 2 and parts[0].lower() in {"bearer", "token"} and parts[1] == expected_key:
+            return
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -89,6 +95,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    client_ip = request.client.host if request.client else "unknown"
+    method = request.method
+    path = request.url.path
+    print(f"[ACCESS] {client_ip} {method} {path} - incoming", flush=True)
+    response = await call_next(request)
+    print(f"[ACCESS] {client_ip} {method} {path} -> {response.status_code}", flush=True)
+    return response
 
 
 class AddPayload(BaseModel):
@@ -232,7 +249,7 @@ def main() -> None:
     host = os.getenv("E2MEM_HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
     print(f"Starting E2Mem Evidence Anchor FastAPI server on {host}:{port}")
-    uvicorn.run("service.api:app", host=host, port=port, log_level="info", access_log=False)
+    uvicorn.run("service.api:app", host=host, port=port, log_level="info", access_log=True)
 
 
 if __name__ == "__main__":
