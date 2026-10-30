@@ -180,19 +180,19 @@ All 32 unit tests execute in `< 3.0` seconds:
 
 ---
 
-## 📚 References & Prior Work
+## 📚 Original Work Disclosure & References
 
-E²-Mem Evidence Anchor builds upon and references the following research papers, benchmarks, and frameworks:
+### 🧑‍💻 Original Work Statement
+- **Original Implementation**: The hierarchical memory architecture, tri-tier representations (Episodes / Events / Verbatim Raw), evidence anchoring pipeline, atomic PairGuard, and FastAPI/SQLite microservice implementation in this repository are our original work developed for the **E²-Mem** project.
+- **Core Research Paper**:
+  - **E2-Mem**: *An Episodic-Event Hierarchical Memory Framework for Long-Term Web-Based LLM Agents*. Accepted at **WISE 2026** (to appear in Springer LNCS). [Paper Repository](https://github.com/jianminYa/e2mem)
 
-### Core Research
-- **E2-Mem**: *An Episodic-Event Hierarchical Memory Framework for Long-Term Web-Based LLM Agents*. Accepted at **WISE 2026** (to appear in Springer LNCS). [Official Repository](https://github.com/jianminYa/e2mem-aml-public)
-
-### Methodology & Algorithms
+### 🔬 Methodology & Algorithmic Attribution
 - **BM25 Scoring**: S. Robertson, H. Zaragoza, et al. *The Probabilistic Relevance Framework: BM25 and Beyond*, Foundations and Trends in Information Retrieval, 2009.
 - **Reciprocal Rank Fusion (RRF)**: G. V. Cormack, C. L. Clarke, and S. Buettcher. *Reciprocal rank fusion outperforms condorcet and individual rank learning methods*, SIGIR 2009.
 - **Reranker Note**: An optional external reranker interface (`service/jev_client.py`) is supported in code but is disabled (`ENABLE_JEV=0`) in the official competition deployment.
 
-### Evaluation Benchmarks & Infrastructure
+### 🧪 Evaluation Benchmarks & Infrastructure
 - **FastAPI & Uvicorn**: High-performance asynchronous web framework and ASGI server for Python.
 - **SQLite**: Lightweight relational storage operated in WAL mode.
 - **CLBench**: Context-learning and procedural compliance benchmark for agent rule adherence.
