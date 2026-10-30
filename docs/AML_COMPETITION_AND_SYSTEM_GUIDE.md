@@ -1,9 +1,9 @@
 # AML Competition & E²-Mem Evidence Anchor Technical Manual
 
 > **System Name**: E²-Mem Evidence Anchor  
-> **Version**: 2.6.1-Release  
+> **Version**: 2.6.3  
 > **Benchmark Platform**: Agent Memory Leaderboard (AML 2026)  
-> **Language**: Python 3.11+ / FastAPI / SQLite (WAL mode) / PyTorch  
+> **Language**: Python 3.11+ / FastAPI / SQLite (WAL mode)  
 
 ---
 
@@ -41,7 +41,7 @@ The memory service must strictly satisfy the following HTTP REST specification:
 {
   "status": "ok",
   "service": "e2mem-evidence-anchor",
-  "version": "2.6.0"
+  "version": "2.6.3"
 }
 ```
 
@@ -105,15 +105,14 @@ The memory service must strictly satisfy the following HTTP REST specification:
 
 ---
 
-### 1.3 Latency & Reader Budget Constraints
+### 1.3 Latency & Reader Budget Considerations
 
-| Constraint | Limit | Description / Rationale |
-| :--- | :---: | :--- |
-| **Search Latency SLA** | **P95 < 200ms** | Real-time agentic interaction requires immediate memory retrieval. Heavy multi-step online LLMs or deep cross-encoders are prohibited in the search path. |
-| **Downstream Reader Window** | **128,000 tokens** | The raw context window of `gpt-4o-mini`. |
-| **AML Reader Input Budget** | **117,760 tokens** | Maximum prompt input token budget officially permitted by the AML platform. |
-| **E²-Mem Dialogue Budget** | **8,000 tokens** | **Noise Discipline Rule**: Unconstrained context injection dilutes attention and leads to "lost-in-the-middle" hallucinations on conversational tasks (LoCoMo, PersonaMem). |
-| **E²-Mem Document Budget** | **24,000 tokens** | **Modality-Aware Rule**: Long-form statutory documents and technical manuals (CLBench) require extended context to preserve full legal clauses. |
+| Constraint / Setting | Limit | Nature | Description / Rationale |
+| :--- | :---: | :---: | :--- |
+| **Downstream Reader Window** | **128,000 tokens** | Platform Constraint | The raw context window of downstream judge model `gpt-4o-mini`. |
+| **AML Reader Input Budget** | **117,760 tokens** | Platform Constraint | Maximum prompt input token budget officially permitted by the AML platform. |
+| **E²-Mem Dialogue Budget** | **8,000 tokens** | System Design Choice | **Noise Discipline Rule**: Enforced by E²-Mem to avoid attention dilution and "lost-in-the-middle" hallucinations on conversational tasks. |
+| **E²-Mem Document Budget** | **24,000 tokens** | System Design Choice | **Modality-Aware Rule**: Extended context dynamically allocated for long-form statutory documents and technical manuals. |
 
 ---
 
@@ -128,12 +127,12 @@ flowchart TD
         A4 --> M1[Tier 1: Atomic Events]
         A4 --> M2[Tier 2: Narrative Episodes]
         A4 --> M3[Tier 3: Verbatim Raw Turns]
-        M1 & M2 & M3 --> Storage[(SQLite WAL Engine + FTS5 Index)]
+        M1 & M2 & M3 --> Storage[(SQLite WAL Engine)]
     end
 
-    subgraph Retrieval Pipeline ["POST /search (Sub-200ms Search)"]
+    subgraph Retrieval Pipeline ["POST /search (Evidence Retrieval)"]
         S1[Query] --> S2[Dense Vector Retrieval: text-embedding-v4]
-        S1 --> S3[Lexical Keyword Retrieval: SQLite FTS5 BM25]
+        S1 --> S3[Lexical Keyword Scoring: In-Memory BM25]
         S2 & S3 --> S4[Reciprocal Rank Fusion RRF]
         Storage --> S2 & S3
     end
@@ -144,7 +143,8 @@ flowchart TD
         B2 --> B3[Tri-Tier Channel Quotas: 55% EV / 25% EP / 20% RAW]
         B3 --> B4[Modality-Aware Budget Enforcer: 8K vs 24K]
         B4 --> B5[Strict Top-k Cutoff Guard: len <= top_k]
-        B5 --> Output[Ranked Memory Context]
+        B5 --> B6[Privacy Redaction: Luhn & Credentials]
+        B6 --> Output[Ranked & Redacted Context]
     end
 ```
 
@@ -200,30 +200,40 @@ When an Atomic Event is retrieved, the **Evidence Anchor** engine resolves its e
 
 ## 3. Database Schema
 
-Stored in SQLite with WAL (Write-Ahead Logging) mode enabled for high concurrency:
+Stored in SQLite with WAL (Write-Ahead Logging) mode enabled for high concurrency and atomic transactions:
 
 ```sql
-CREATE TABLE IF NOT EXISTS memories (
+CREATE TABLE IF NOT EXISTS requests(
+    request_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    body_hash TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS memories(
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
-    kind TEXT NOT NULL, -- 'event', 'episode', 'raw'
+    session_id TEXT NOT NULL,
+    request_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    parent_id TEXT,
+    turn_index INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    source_time TEXT NOT NULL,
     content TEXT NOT NULL,
-    session_id TEXT,
-    timestamp TEXT,
-    dense_vec BLOB,
-    metadata_json TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    evidence TEXT NOT NULL,
+    vector BLOB NOT NULL,
+    created_at TEXT NOT NULL,
+    source_refs TEXT NOT NULL,
+    aliases TEXT NOT NULL,
+    keywords TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    time_anchor TEXT NOT NULL,
+    topic_labels TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_memories_user_kind ON memories(user_id, kind);
-CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(user_id, session_id);
-
-CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
-    id UNINDEXED,
-    user_id,
-    content,
-    tokenize='porter unicode61'
-);
+CREATE INDEX IF NOT EXISTS idx_memories_user_session ON memories(user_id, session_id);
 ```
 
 ---

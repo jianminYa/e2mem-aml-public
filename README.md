@@ -12,8 +12,9 @@
 
 ## 📌 Competition Version Declaration
 
-- **Declared Version**: `2.6.3`
-- **Competition Tag**: **`v2.6.3-clean`** (Declared Commit: `9b98bc7`)
+- **Competition Version**: `2.6.3`
+- **Competition Tag**: **`v2.6.3-clean`**
+- **Service Code Guarantee**: Service code (`service/`) is byte-identical from commit `2e5230b` to the declared commit; later commits update documentation, configuration, and dependencies only. The declared evaluation commit is recorded on the AML platform.
 - **Note on Tags**: The repository contains an earlier experimental tag `v2.7-release` (created 2026-10-27) from exploratory offline experiments on verbatim window expansion. It is not part of the active competition deployment. The official submitted and evaluated release is **`v2.6.3-clean`**.
 
 ---
@@ -24,11 +25,11 @@ E²-Mem Evidence Anchor structures conversational and document memory into a mul
 
 1. **Tri-Tier Representation**:
    - **Atomic Events**: Fine-grained factual statements extracted from dialogue turns, timestamped and entity-attributed.
-   - **Session Episodes**: Thematic summaries representing conversational phases and topics.
+   - **Episodes**: Thematic summaries generated for each extraction chunk (approx. 6–8 messages).
    - **Verbatim Raw Turns**: Unmodified source utterances preserving original quotes, code, and exact phrasing.
 
 2. **Evidence Anchor Retrieval**:
-   - Multi-channel candidate scoring combining dense vector similarity (`text-embedding-v4`) with lexical BM25 matching over SQLite FTS5.
+   - Multi-channel candidate scoring combining dense vector similarity (brute-force cosine over user candidates with `text-embedding-v4`) with BM25-style lexical scoring computed in Python over stored candidate rows.
    - Reciprocal Rank Fusion (RRF) and top-down synergy scoring linking events to their parent episodes.
    - Grounded context assembly: retrieved facts are anchored directly to their parent episode and verbatim source snippet, preventing out-of-context misinterpretation.
 
@@ -44,7 +45,7 @@ E²-Mem Evidence Anchor structures conversational and document memory into a mul
 ## 🔄 Changes in v2.6.3 (Relative to v2.6.2)
 
 - **Privacy Redaction**: Added pattern-based redaction on `/search` output using Luhn algorithm validation for payment card numbers and context-bounded filters for sensitive credentials (API keys, private keys, secrets). Stored database records remain intact; only rendered search responses are sanitized.
-- **Structured Trace Logging**: Added configurable JSONL trace logging for incoming `/add` and `/search` requests, recording timestamps, options payloads, token counts, and latency metrics for auditability.
+- **Structured Trace Logging**: Added configurable JSONL trace logging for incoming `/add` and `/search` requests, recording timestamps, options payloads, redaction counts, returned items count, and latency metrics for auditability.
 - **API Options Field Support**: Added support for the optional `options` list field in the `POST /search` payload for choice-based evaluation benchmarks.
 
 ---
@@ -64,12 +65,12 @@ flowchart TD
         TriTier --> EV[Tier 1: Atomic Events]
         TriTier --> EP[Tier 2: Narrative Episodes]
         TriTier --> RAW[Tier 3: Verbatim Raw Turns]
-        EV & EP & RAW --> SQLite[(SQLite WAL Storage + FTS5 Full-Text Index)]
+        EV & EP & RAW --> SQLite[(SQLite WAL Storage)]
     end
 
     subgraph Retrieval Pipeline
-        API_Search --> Dense[Dense Vector Search: text-embedding-v4]
-        API_Search --> Lexical[Lexical BM25 Search: SQLite FTS5]
+        API_Search --> Dense[Dense Vector Cosine: text-embedding-v4]
+        API_Search --> Lexical[Lexical BM25 Scoring: In-Memory Python]
         SQLite --> Dense & Lexical
         Dense & Lexical --> RRF[Reciprocal Rank Fusion RRF]
         RRF --> Synergy[Episode-Event Synergy Scoring]
@@ -78,11 +79,11 @@ flowchart TD
     subgraph Context Assembly
         Synergy --> PairGuard[Atomic PairGuard: Contradiction Protection]
         PairGuard --> Budget[Modality Budget Enforcer: 8K Dialog / 24K Doc]
-        Budget --> Redact[Privacy Redaction: Luhn & Credential Guard]
-        Redact --> TopK[Top-k Cutoff Guard: len <= top_k]
+        Budget --> TopK[Top-k Cutoff Guard: len <= top_k]
+        TopK --> Redact[Privacy Redaction: Luhn & Credential Guard]
     end
 
-    TopK -->|Ranked & Grounded Context| User
+    Redact -->|Ranked, Redacted & Grounded Context| User
 ```
 
 ---
@@ -181,13 +182,23 @@ All 32 unit tests execute in `< 3.0` seconds:
 
 ## 📚 References & Prior Work
 
-E²-Mem Evidence Anchor builds upon and references the following research benchmarks, libraries, and frameworks:
-- **FastAPI & Uvicorn**: High-performance asynchronous web framework for Python.
-- **SQLite & FTS5**: Lightweight relational storage with integrated BM25 full-text search indexing.
+E²-Mem Evidence Anchor builds upon and references the following research papers, benchmarks, and frameworks:
+
+### Core Research
+- **E²-Mem**: Accepted at **WISE 2026**.
+
+### Methodology & Algorithms
+- **BM25 Scoring**: S. Robertson, H. Zaragoza, et al. *The Probabilistic Relevance Framework: BM25 and Beyond*, Foundations and Trends in Information Retrieval, 2009.
+- **Reciprocal Rank Fusion (RRF)**: G. V. Cormack, C. L. Clarke, and S. Buettcher. *Reciprocal rank fusion outperforms condorcet and individual rank learning methods*, SIGIR 2009.
+- **Reranker Note**: An optional external reranker interface (`service/jev_client.py`) is supported in code but is disabled (`ENABLE_JEV=0`) in the official competition deployment.
+
+### Evaluation Benchmarks & Infrastructure
+- **FastAPI & Uvicorn**: High-performance asynchronous web framework and ASGI server for Python.
+- **SQLite**: Lightweight relational storage operated in WAL mode.
+- **CLBench**: Context-learning and procedural compliance benchmark for agent rule adherence.
 - **LoCoMo**: Long-Horizon Conversational Memory Benchmark.
 - **PersonaMem**: Benchmark for personalized preference tracking and persona consistency.
 - **BEAM**: Multi-session long-context synthesis benchmark.
-- **CLBench**: Continual learning and procedural compliance benchmark.
 - **LongMemEval**: Standardized conversational long-term memory evaluation.
 
 ---

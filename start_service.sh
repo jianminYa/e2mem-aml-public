@@ -18,7 +18,7 @@ E2MEM_MODE="${E2MEM_MODE:-competition}"
 mkdir -p "$(dirname "$E2MEM_DB")"
 
 echo "=========================================================="
-echo " Starting E²-Mem Evidence Anchor (AML Service v2.6)"
+echo " Starting E²-Mem Evidence Anchor (AML Service v2.6.3)"
 echo " Host:     ${E2MEM_HOST}:${PORT}"
 echo " Database: ${E2MEM_DB}"
 echo " Mode:     ${E2MEM_MODE}"
