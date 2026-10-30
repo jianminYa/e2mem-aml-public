@@ -1,8 +1,8 @@
-# E²-Mem Evidence Anchor (v2.6.1)
+# E²-Mem Evidence Anchor (v2.6.3)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![AML Compatible](https://img.shields.io/badge/AML-Compatible%20v2.6-green.svg)](https://agentmemoryleaderboard.ai/)
+[![AML Compatible](https://img.shields.io/badge/AML-Compatible%20v2.6.3-green.svg)](https://agentmemoryleaderboard.ai/)
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Tests Passing](https://img.shields.io/badge/tests-22%20passed-brightgreen.svg)](tests/)
 
@@ -65,6 +65,14 @@ flowchart TD
 
     TopKGuard -->|Ranked & Grounded Memory Context| User
 ```
+
+### Privacy Redaction & Production Trace Logging (v2.6.3)
+- **Zero-False-Positive Privacy Redaction**: Strictly enforces Luhn algorithm checksum validation on payment cards and context-bounded credential matching (API keys, secrets, private keys) before returning evidence to upstream evaluators. Stored memory remains intact while rendered text is safely redacted.
+- **Full Trace Auditability**: High-fidelity structured logging of every ingestion (`POST /add`) and retrieval (`POST /search`) event with microsecond timestamps, option payloads, token quotas, and exact returned blocks without network overhead or search failure risk.
+
+### Release Branches & Evaluation Tags
+- **Official Competition Release**: **`v2.6.3-clean`** (commit `96680c0` / `2e5230b`) is the official clean deployed version for the Agent Memory Challenge (AML 2026).
+- **Historical / Experimental Tags**: The `v2.7-release` tag (created 2026-10-27) was an early exploratory research snapshot exploring verbatim window expansion on local offline benchmarks; it is not evaluated on the live leaderboard.
 
 ### Key Architectural Pillars
 - **Tri-Tier Storage Hierarchy**: Deconstructs raw context into Atomic Events (fine facts with timestamps), Session Episodes (thematic summaries), and Raw Turns (verbatim exact quotes).
@@ -150,7 +158,7 @@ Returns system status and version:
 curl http://localhost:8000/health
 ```
 ```json
-{"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.6.0"}
+{"status": "ok", "service": "e2mem-evidence-anchor", "version": "2.6.3"}
 ```
 
 ### 2. `POST /add`
