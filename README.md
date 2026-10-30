@@ -185,7 +185,7 @@ All 32 unit tests execute in `< 3.0` seconds:
 E²-Mem Evidence Anchor builds upon and references the following research papers, benchmarks, and frameworks:
 
 ### Core Research
-- **E²-Mem**: Accepted at **WISE 2026**.
+- **E2-Mem**: *An Episodic-Event Hierarchical Memory Framework for Long-Term Web-Based LLM Agents*. Accepted at **WISE 2026** (to appear in Springer LNCS). [Official Repository](https://github.com/jianminYa/e2mem-aml-public)
 
 ### Methodology & Algorithms
 - **BM25 Scoring**: S. Robertson, H. Zaragoza, et al. *The Probabilistic Relevance Framework: BM25 and Beyond*, Foundations and Trends in Information Retrieval, 2009.
